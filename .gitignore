@@ -1,0 +1,11 @@
+kafka-network/channel-artifacts/*.tx
+kafka-network/channel-artifacts/*.block
+kafka-network/crypto-config/*
+kafka-network/chaincode/
+kafka-network/docker-compose-cli.yaml
+kafka-network/bin/
+kafka-network/config/
+client/node_modules
+client/cert/*.pem
+client/cert/*_key
+client/config/*.tx
