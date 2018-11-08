@@ -1,17 +1,17 @@
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
-import {Routes} from './routes/channelRoutes';
+import {Routes} from './routes';
 import * as mongoose from 'mongoose';
 
 class App {
     public app: express.Application;
-    public routePrv: Routes = new Routes();
+    public routes: Routes = new Routes();
     public mongoUrl: string = 'mongodb://127.0.0.1:27017/exampledb';
 
     constructor() {
         this.app = express();
         this.config();
-        this.routePrv.routes(this.app);
+        this.routes.init(this.app);
         this.mongoSetup();
     }
 
@@ -26,8 +26,26 @@ class App {
     }
 
     private mongoSetup(): void {
-        /*mongoose.Promise = global.Promise;
-        mongoose.connect(this.mongoUrl);*/
+        (<any>mongoose).Promise = global.Promise;
+        mongoose.connect(this.mongoUrl, {
+            useNewUrlParser: true,
+        });
+
+        /*mongoose.connection.collections['channels'].drop( function(err) {
+            console.log('collection dropped Channel');
+        });
+
+        mongoose.connection.collections['joins'].drop( function(err) {
+            console.log('collection dropped Joins');
+        });
+
+        mongoose.connection.collections['chaincodeinstalls'].drop( function(err) {
+            console.log('collection dropped ChaincodeInstall');
+        });
+
+        mongoose.connection.collections['chaincodeinstantiates'].drop( function(err) {
+            console.log('collection dropped ChaincodeInstantiate');
+        });*/
     }
 }
 
