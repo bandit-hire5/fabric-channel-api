@@ -1,7 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+// import Client = require('fabric-client');
 import Client = require('fabric-client');
+import { CryptoContent, Orderer, Peer } from "fabric-client";
 
 const NETWORK_DIR = './../../../kafka-network';
 const CHANNEL_1_PATH = NETWORK_DIR + '/channel-artifacts/channel.tx';
@@ -113,7 +115,7 @@ export async function getClient(org: Organization): Promise<Client> {
     const privateKeyFile = fs.readdirSync(__dirname + '/../' + ORG_ADMIN_MSP + '/keystore')[0];
 
     // ###  GET THE NECESSRY KEY MATERIAL FOR THE ADMIN OF THE SPECIFIED ORG  ##
-    const cryptoContentOrgAdmin: IdentityFiles = {
+    const cryptoContentOrgAdmin: CryptoContent = {
         privateKey: ORG_ADMIN_MSP + '/keystore/' + privateKeyFile,
         signedCert: ORG_ADMIN_MSP + '/signcerts/Admin@' + org + '.example.com-cert.pem'
     };
@@ -121,7 +123,8 @@ export async function getClient(org: Organization): Promise<Client> {
     await client.createUser({
         username: `${org}-admin`,
         mspid: MSP_ID[org],
-        cryptoContent: cryptoContentOrgAdmin
+        cryptoContent: cryptoContentOrgAdmin,
+        skipPersistence: false,
     });
 
     return client;
