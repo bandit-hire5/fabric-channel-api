@@ -9,3 +9,5 @@ client/node_modules
 client/cert/*.pem
 client/cert/*_key
 client/config/*.tx
+rest-server/dist
+rest-server/node_modules
