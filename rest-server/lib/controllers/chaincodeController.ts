@@ -3,7 +3,7 @@ import {ChannelSchema} from '../models/channel/channelModel';
 import {ChaincodeInstallSchema} from '../models/chaincode/chaincodeInstallModel';
 import {ChaincodeInstantiateSchema} from '../models/chaincode/chaincodeInstantiateModel';
 import {Request, Response} from 'express';
-import {ORG_LIST, getClient, getPeers, getOrderer, getChannel} from '../services/client';
+import {ORG_LIST, getClient, getPeers, getOrderer, getChannel, getPolicy} from '../services/client';
 import promise from '../services/promise';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -92,14 +92,14 @@ export class ChaincodeController {
         }
 
         try {
-            const client = await getClient(ORG_LIST[req.body.org]);
+            const client = await getClient(ORG_LIST[orgName]);
             const orderer = await getOrderer(client);
 
             const channel = client.newChannel(channelName);
 
             channel.addOrderer(orderer);
 
-            const peers = await getPeers(client, ORG_LIST[req.body.org]);
+            const peers = await getPeers(client, ORG_LIST[orgName]);
 
             const data = await client.installChaincode({
                 targets: peers,
@@ -203,21 +203,42 @@ export class ChaincodeController {
         }
 
         try {
-            const client = await getClient(ORG_LIST[req.body.org]);
+            const client = await getClient(ORG_LIST[orgName]);
 
-            const channel = await getChannel(client, ORG_LIST[req.body.org], channelName);
+            const channel = await getChannel(client, ORG_LIST[orgName], channelName);
 
-            const proposalResponse = await channel.sendInstantiateProposal({
+            const results = await channel.sendInstantiateProposal({
+            //const results = await channel.sendUpgradeProposal({
                 chaincodeId: chaincodeName,
                 chaincodeVersion: 'v0',
-                fcn: 'initLedger',
+                fcn: 'init',
                 args: [],
                 txId: client.newTransactionID(),
+                'endorsement-policy': getPolicy(),
             });
 
+            const proposalResponses = results[0];
+            const proposal = results[1];
+
+            let all_good = true;
+
+            for (let i in proposalResponses) {
+                let one_good = false;
+
+                if (proposalResponses[i].response && proposalResponses[i].response.status === 200) {
+                    one_good = true;
+                }
+
+                all_good = all_good && one_good;
+            }
+
+            if (!all_good) {
+                throw new Error('Failed to send Instantiate Proposal or receive valid response. Response null or status is not 200. exiting...');
+            }
+
             const data = await channel.sendTransaction({
-                proposalResponses: proposalResponse[0],
-                proposal: proposalResponse[1],
+                proposalResponses: proposalResponses,
+                proposal: proposal,
             });
 
             this.response = new SuccessResponse({data});

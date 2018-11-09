@@ -7,7 +7,7 @@ export class Routes {
     public queryController: QueryController = new QueryController();
 
     public routes(app: any): void {
-        app.use('/query/allCars', (req: Request, res: Response, next: NextFunction) => {
+        app.use('/query', (req: Request, res: Response, next: NextFunction) => {
             if (!req.query.chaincodeName) {
                 let response = new ErrorResponse({
                     code: 400,
@@ -69,5 +69,18 @@ export class Routes {
 
         app.route('/query/allCars')
             .get(this.queryController.allCars.bind(this.queryController));
+
+        app.route('/query/сar')
+            .get((req: Request, res: Response, next: NextFunction) => {
+                if (!req.query.carNumber) {
+                    let response = new ErrorResponse({
+                        code: 400,
+                        type: 'BAD_REQUEST',
+                        message: 'The field curNumber is required',
+                    });
+
+                    return res.status(400).json(response);
+                }
+            }, this.queryController.getCar.bind(this.queryController));
     }
 }

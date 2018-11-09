@@ -96,7 +96,7 @@ export async function getOrderer(client: Client): Promise<Orderer> {
 export async function getClient(org: Organization): Promise<Client> {
     const client = new Client();
 
-    console.log('Setting up the cryptoSuite ..');
+    Client.setConfigSetting('request-timeout', 120000);
 
     // ## Setup the cryptosuite (we are using the built in default s/w based implementation)
     const cryptoSuite = Client.newCryptoSuite();
@@ -106,16 +106,12 @@ export async function getClient(org: Organization): Promise<Client> {
 
     client.setCryptoSuite(cryptoSuite);
 
-    console.log('Setting up the keyvalue store ..');
-
     // ## Setup the default keyvalue store where the state will be stored
     const store = await Client.newDefaultKeyValueStore({
         path: `${KEY_STORE_PATH_ADMIN}-${org}`,
     });
 
     client.setStateStore(store);
-
-    console.log('Creating the admin user context ..');
 
     const ORG_ADMIN_MSP = MSP_DIR[org];
 
@@ -137,6 +133,28 @@ export async function getClient(org: Organization): Promise<Client> {
     return client;
 }
 
+async function getAllPeers(client: Client): Promise<Peer[]> {
+    const peers: Peer[] = [];
+
+    for (let y in ORG_LIST) {
+        let org = ORG_LIST[y];
+
+        for (let i = 0; i < 2; i++) {
+            const tls_cacert = `${NETWORK_DIR}/crypto-config/peerOrganizations/${org}.example.com/peers/peer${i}.${org}.example.com/tls/ca.crt`;
+
+            const data = fs.readFileSync(path.join(__dirname, tls_cacert));
+            const p = client.newPeer(PEERS[org].peers[i].url, {
+                'pem': Buffer.from(data).toString(),
+                'ssl-target-name-override': `peer${i}.${org}.example.com`,
+            });
+
+            peers[i] = p;
+        }
+    }
+
+    return peers;
+}
+
 export async function getChannel(client: Client, org: Organization, channelName: string): Promise<Channel> {
     const orderer = await getOrderer(client);
 
@@ -144,11 +162,36 @@ export async function getChannel(client: Client, org: Organization, channelName:
 
     channel.addOrderer(orderer);
 
-    const peers = await getPeers(client, org);
+    //const peers = await getPeers(client, org);
+    const peers = await getAllPeers(client);
 
     peers.map(p => channel.addPeer(p, p['grpc.ssl_target_name_override']));
 
     await channel.initialize();
 
     return channel;
+}
+
+export function getPolicy(): Object {
+    return {
+        identities: [
+            { role: { name: "member", mspId: "Org1MSP" }},
+            { role: { name: "member", mspId: "Org2MSP" }},
+        ],
+        policy: {
+            "1-of": [{ "signed-by": 0 }, { "signed-by": 1 }]
+        }
+    };
+    /*return {
+        identities: [
+            { role: { name: "member", mspId: "Org1MSP" }},
+            { role: { name: "member", mspId: "Org2MSP" }},
+        ],
+        policy: {
+            "2-of": [
+                { "signed-by": 0},
+                { "signed-by": 1},
+            ]
+        }
+    };*/
 }

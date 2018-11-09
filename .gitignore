@@ -11,3 +11,4 @@ client/cert/*_key
 client/config/*.tx
 rest-server/dist
 rest-server/node_modules
+rest-server/keystore
