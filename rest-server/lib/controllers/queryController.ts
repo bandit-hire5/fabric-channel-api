@@ -1,79 +1,57 @@
 import {Request, Response} from 'express';
-import {ORG_LIST, getClient, getChannel} from '../services/client';
-import ErrorResponse from "../models/response/ErrorResponse";
-import SuccessResponse from "../models/response/Response";
+import {getClient, getChannel} from '../services/client';
+import {error, response} from "../helpers/response";
 
 export class QueryController {
-    private response = {};
-
     public async allCars(req: Request, res: Response) {
-        const chaincodeName = req.query.chaincodeName;
-        const channelName = req.query.channelName;
-        const orgName = ORG_LIST[req.query.org];
+        const {chaincodeName, channelName, org} = req.query;
 
         try {
-            const client = await getClient(orgName);
+            const client = await getClient(org);
 
-            const channel = await getChannel(client, orgName, channelName);
+            const channel = await getChannel(client, org, channelName);
 
-            const response = await channel.queryByChaincode({
+            const results = await channel.queryByChaincode({
                 chaincodeId: chaincodeName,
                 fcn: 'queryAllCars',
                 args: [],
             });
 
             try {
-                let data = JSON.parse(response[0].toString('utf8'));
+                let data = JSON.parse(results[0].toString('utf8'));
 
-                this.response = new SuccessResponse({data});
-
-                res.json(this.response);
+                return response(res, data);
             } catch(e) {
-                throw new Error('');
+                throw new Error('Failed to get query result');
             }
         } catch(err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: err.toString(),
-            });
-
-            return res.status(500).json(this.response);
+            return error(res, 500, 'INTERNAL_SERVER_ERROR', err.toString());
         }
     }
 
     public async getCar(req: Request, res: Response) {
-        const chaincodeName = req.query.chaincodeName;
-        const channelName = req.query.channelName;
-        const orgName = ORG_LIST[req.query.org];
-        const carNumber = req.query.carNumber;
+        const {chaincodeName, channelName, org, id} = req.query;
 
         try {
-            const client = await getClient(orgName);
+            const client = await getClient(org);
 
-            const channel = await getChannel(client, orgName, channelName);
+            const channel = await getChannel(client, org, channelName);
 
-            const response = await channel.queryByChaincode({
+            const results = await channel.queryByChaincode({
                 chaincodeId: chaincodeName,
                 fcn: 'queryCar',
-                args: [carNumber],
+                args: [id],
             });
 
             try {
-                let data = JSON.parse(response[0].toString('utf8'));
+                let data = JSON.parse(results[0].toString('utf8'));
 
-                this.response = new SuccessResponse({data});
-
-                res.json(this.response);
+                return response(res, data);
             } catch(e) {
-                throw new Error('');
+                throw new Error('Failed to get query result');
             }
         } catch(err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: err.toString(),
-            });
-
-            return res.status(500).json(this.response);
+            return error(res, 500, 'INTERNAL_SERVER_ERROR', err.toString());
         }
     }
 }

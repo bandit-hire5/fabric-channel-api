@@ -3,8 +3,8 @@ import * as mongoose from 'mongoose';
 const Schema = mongoose.Schema;
 
 export const ChannelSchema = new Schema({
-    name: {
+    channelName: {
         type: String,
-        required: 'Enter a channel name'
+        required: 'Enter a channel name',
     },
 });

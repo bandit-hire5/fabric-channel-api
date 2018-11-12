@@ -1,52 +1,50 @@
 import * as express from 'express';
-import * as bodyParser from 'body-parser';
 import {Routes} from './routes';
 import * as mongoose from 'mongoose';
+import config from './config';
+import ExpressConfig from './config/express';
 
 class App {
     public app: express.Application;
-    public routes: Routes = new Routes();
-    public mongoUrl: string = 'mongodb://127.0.0.1:27017/exampledb';
+    public routes: Routes;
+    public expressConfig: ExpressConfig;
 
     constructor() {
         this.app = express();
+        this.routes = new Routes();
+        this.expressConfig = new ExpressConfig();
+    }
+
+    public init(): void {
         this.config();
         this.routes.init(this.app);
-        this.mongoSetup();
+        this.connect();
+
+        mongoose.connection
+            .on('error', console.log)
+            .on('disconnected', this.connect.bind(this))
+            .once('open', this.listen.bind(this));
+    }
+
+    public listen(): void {
+        const PORT = process.env.PORT || 3000;
+
+        this.app.listen(PORT, () => {
+            console.log('Express server listening on port ' + PORT);
+        });
     }
 
     private config(): void {
-        // support application/json type post data
-        this.app.use(bodyParser.json());
-
-        //support application/x-www-form-urlencoded post data
-        this.app.use(bodyParser.urlencoded({
-            extended: false,
-        }));
+        this.expressConfig.init(this.app);
     }
 
-    private mongoSetup(): void {
-        (<any>mongoose).Promise = global.Promise;
-        mongoose.connect(this.mongoUrl, {
+    private connect(): void {
+        const options = {
             useNewUrlParser: true,
-        });
+        };
 
-        /*mongoose.connection.collections['channels'].drop( function(err) {
-            console.log('collection dropped Channel');
-        });
-
-        mongoose.connection.collections['joins'].drop( function(err) {
-            console.log('collection dropped Joins');
-        });
-
-        mongoose.connection.collections['chaincodeinstalls'].drop( function(err) {
-            console.log('collection dropped ChaincodeInstall');
-        });
-
-        mongoose.connection.collections['chaincodeinstantiates'].drop( function(err) {
-            console.log('collection dropped ChaincodeInstantiate');
-        });*/
+        mongoose.connect(config.db, options);
     }
 }
 
-export default new App().app;
+export default new App();

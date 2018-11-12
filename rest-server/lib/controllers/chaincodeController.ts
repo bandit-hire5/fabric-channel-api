@@ -3,103 +3,53 @@ import {ChannelSchema} from '../models/channel/channelModel';
 import {ChaincodeInstallSchema} from '../models/chaincode/chaincodeInstallModel';
 import {ChaincodeInstantiateSchema} from '../models/chaincode/chaincodeInstantiateModel';
 import {Request, Response} from 'express';
-import {ORG_LIST, getClient, getPeers, getOrderer, getChannel, getPolicy} from '../services/client';
+import {ORG_LIST, getClient, getPeers, getOrderer, getChannel} from '../services/client';
 import promise from '../services/promise';
-import * as fs from 'fs';
 import * as path from 'path';
-import ErrorResponse from "../models/response/ErrorResponse";
-import SuccessResponse from "../models/response/Response";
+import {error, response} from "../helpers/response";
+import config from '../config';
 
 const Channel = mongoose.model('Channel', ChannelSchema);
 const ChaincodeInstall = mongoose.model('ChaincodeInstall', ChaincodeInstallSchema);
 const ChaincodeInstantiate = mongoose.model('ChaincodeInstantiate', ChaincodeInstantiateSchema);
 
 export class ChaincodeController {
-    private response = {};
-
     public async install(req: Request, res: Response) {
-        const chaincodeName = req.body.chaincodeName;
-        const channelName = req.body.channelName;
-        const orgName = req.body.org;
-
-        let result = await promise(Channel, Channel.findOne, {
-            name: channelName,
-        });
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (!result.res) {
-            this.response = new ErrorResponse({
-                code: 404,
-                type: 'NOT_FOUND',
-                message: 'Channel does not exists',
-            });
-
-            return res.status(404).json(this.response);
-        }
-
-        result = await promise(ChaincodeInstall, ChaincodeInstall.findOne, {
-            chaincodeName: chaincodeName,
-            channelName: channelName,
-            org: orgName,
-        });
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (result.res) {
-            this.response = new ErrorResponse({
-                code: 403,
-                type: 'FORBIDDEN',
-                message: 'Chaincode already installed',
-            });
-
-            return res.status(403).json(this.response);
-        }
-
-        const newChaincodeInstall = new ChaincodeInstall(req.body);
-
-        result = await promise(newChaincodeInstall, newChaincodeInstall.save);
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (!result.res) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-            });
-
-            return res.status(500).json(this.response);
-        }
+        const {chaincodeName, channelName, org} = req.body;
 
         try {
-            const client = await getClient(ORG_LIST[orgName]);
+            let result = await promise(Channel, Channel.findOne, {channelName});
+
+            if (!result.res) {
+                return error(res, 404, 'NOT_FOUND', 'Channel does not exists');
+            }
+
+            result = await promise(ChaincodeInstall, ChaincodeInstall.findOne, {
+                chaincodeName,
+                channelName,
+                org,
+            });
+
+            if (result.res) {
+                return error(res, 403, 'FORBIDDEN', 'Chaincode already installed');
+            }
+
+            const newChaincodeInstall = new ChaincodeInstall(req.body);
+
+            result = await promise(newChaincodeInstall, newChaincodeInstall.save);
+
+            if (!result.res) {
+                return error(res, 500, 'INTERNAL_SERVER_ERROR');
+            }
+
+            const client = await getClient(ORG_LIST[org]);
             const orderer = await getOrderer(client);
 
             const channel = client.newChannel(channelName);
 
             channel.addOrderer(orderer);
 
-            const peers = await getPeers(client, ORG_LIST[orgName]);
+            const peers = await getPeers(client, ORG_LIST[org]);
 
             const data = await client.installChaincode({
                 targets: peers,
@@ -110,115 +60,59 @@ export class ChaincodeController {
                 txId: client.newTransactionID(),
             });
 
-            this.response = new SuccessResponse({data});
-
-            res.json(this.response);
+            return response(res, data);
         } catch(err) {
             await promise(ChaincodeInstall, ChaincodeInstall.deleteOne, {
-                chaincodeName: chaincodeName,
-                channelName: channelName,
-                org: orgName,
+                chaincodeName,
+                channelName,
+                org,
             });
 
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: err.toString(),
-            });
-
-            return res.status(500).json(this.response);
+            return error(res, 500, 'INTERNAL_SERVER_ERROR', err.toString());
         }
     }
 
     public async instantiate(req: Request, res: Response) {
-        const chaincodeName = req.body.chaincodeName;
-        const channelName = req.body.channelName;
-        const orgName = req.body.org;
-
-        let result = await promise(Channel, Channel.findOne, {
-            name: channelName,
-        });
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (!result.res) {
-            this.response = new ErrorResponse({
-                code: 404,
-                type: 'NOT_FOUND',
-                message: 'Channel does not exists',
-            });
-
-            return res.status(404).json(this.response);
-        }
-
-        result = await promise(ChaincodeInstantiate, ChaincodeInstantiate.findOne, {
-            chaincodeName: chaincodeName,
-            channelName: channelName,
-        });
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (result.res) {
-            this.response = new ErrorResponse({
-                code: 403,
-                type: 'FORBIDDEN',
-                message: 'Chaincode already instantiated',
-            });
-
-            return res.status(403).json(this.response);
-        }
-
-        const newChaincodeInstantiate = new ChaincodeInstantiate(req.body);
-
-        result = await promise(newChaincodeInstantiate, newChaincodeInstantiate.save);
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (!result.res) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-            });
-
-            return res.status(500).json(this.response);
-        }
+        const {chaincodeName, channelName, org} = req.body;
 
         try {
-            const client = await getClient(ORG_LIST[orgName]);
+            let result = await promise(Channel, Channel.findOne, {channelName});
 
-            const channel = await getChannel(client, ORG_LIST[orgName], channelName);
+            if (!result.res) {
+                return error(res, 404, 'NOT_FOUND', 'Channel does not exists');
+            }
+
+            result = await promise(ChaincodeInstantiate, ChaincodeInstantiate.findOne, {
+                chaincodeName,
+                channelName,
+            });
+
+            if (result.res) {
+                return error(res, 403, 'FORBIDDEN', 'Chaincode already instantiated');
+            }
+
+            const newChaincodeInstantiate = new ChaincodeInstantiate(req.body);
+
+            result = await promise(newChaincodeInstantiate, newChaincodeInstantiate.save);
+
+            if (!result.res) {
+                return error(res, 500, 'INTERNAL_SERVER_ERROR');
+            }
+
+            const client = await getClient(ORG_LIST[org]);
+
+            const channel = await getChannel(client, ORG_LIST[org], channelName);
 
             const results = await channel.sendInstantiateProposal({
-            //const results = await channel.sendUpgradeProposal({
                 chaincodeId: chaincodeName,
                 chaincodeVersion: 'v0',
                 fcn: 'init',
                 args: [],
                 txId: client.newTransactionID(),
-                'endorsement-policy': getPolicy(),
+                'endorsement-policy': config['endorsement-policy'],
             });
 
-            const proposalResponses = results[0];
-            const proposal = results[1];
+            const [proposalResponses, proposal] = results;
 
             let all_good = true;
 
@@ -237,25 +131,18 @@ export class ChaincodeController {
             }
 
             const data = await channel.sendTransaction({
-                proposalResponses: proposalResponses,
-                proposal: proposal,
+                proposalResponses,
+                proposal,
             });
 
-            this.response = new SuccessResponse({data});
-
-            res.json(this.response);
+            return response(res, data);
         } catch(err) {
             await promise(ChaincodeInstantiate, ChaincodeInstantiate.deleteOne, {
-                chaincodeName: chaincodeName,
-                channelName: channelName,
+                chaincodeName,
+                channelName,
             });
 
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: err.toString(),
-            });
-
-            return res.status(500).json(this.response);
+            return error(res, 500, 'INTERNAL_SERVER_ERROR', err.toString());
         }
     }
 }

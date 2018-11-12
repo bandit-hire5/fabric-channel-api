@@ -1,10 +1,8 @@
 import {Request, Response} from 'express';
-import {ORG_LIST, getClient, getChannel, getPolicy} from '../services/client';
-import ErrorResponse from "../models/response/ErrorResponse";
-import SuccessResponse from "../models/response/Response";
+import {ORG_LIST, getClient, getChannel} from '../services/client';
+import {error, response} from "../helpers/response";
 
 export class InvokeController {
-    private response = {};
     private fn: string = '';
     private args: string[] = [];
 
@@ -39,12 +37,13 @@ export class InvokeController {
         const {
             chaincodeName,
             channelName,
+            org,
         } = req.body;
 
         try {
-            const client = await getClient(ORG_LIST[req.body.org]);
+            const client = await getClient(ORG_LIST[org]);
 
-            const channel = await getChannel(client, ORG_LIST[req.body.org], channelName);
+            const channel = await getChannel(client, ORG_LIST[org], channelName);
 
             const results = await channel.sendTransactionProposal({
                 chaincodeId: chaincodeName,
@@ -73,20 +72,13 @@ export class InvokeController {
             }
 
             const data = await channel.sendTransaction({
-                proposalResponses: proposalResponses,
-                proposal: proposal,
+                proposalResponses,
+                proposal,
             });
 
-            this.response = new SuccessResponse({data});
-
-            res.json(this.response);
+            return response(res, data);
         } catch(err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: err.toString(),
-            });
-
-            return res.status(500).json(this.response);
+            return error(res, 500, 'INTERNAL_SERVER_ERROR', err.toString());
         }
     }
 }

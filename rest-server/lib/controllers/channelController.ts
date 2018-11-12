@@ -7,63 +7,31 @@ import promise from '../services/promise';
 import * as fs from 'fs';
 import * as path from 'path';
 import {ChannelRequest} from "fabric-client";
-import ErrorResponse from "../models/response/ErrorResponse";
-import SuccessResponse from "../models/response/Response";
+import {error, response} from "../helpers/response";
 
 const Channel = mongoose.model('Channel', ChannelSchema);
 const Joins = mongoose.model('Joins', JoinsSchema);
 
 export class ChannelController {
-    private response = {};
-    
     public async create(req: Request, res: Response) {
-        const channelName = req.body.name;
-        let result = await promise(Channel, Channel.findOne, {
-            name: channelName,
-        });
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (result.res) {
-            this.response = new ErrorResponse({
-                code: 403,
-                type: 'FORBIDDEN',
-                message: 'Channel already exists',
-            });
-
-            return res.status(403).json(this.response);
-        }
-
-        const newChannel = new Channel(req.body);
-
-        result = await promise(newChannel, newChannel.save);
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (!result.res) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-            });
-
-            return res.status(500).json(this.response);
-        }
+        const {channelName, org} = req.body;
 
         try {
-            const client = await getClient(ORG_LIST[req.body.org]);
+            let result = await promise(Channel, Channel.findOne, {channelName});
+
+            if (result.res) {
+                return error(res, 403, 'FORBIDDEN', 'Channel already exists');
+            }
+
+            const newChannel = new Channel(req.body);
+
+            result = await promise(newChannel, newChannel.save);
+
+            if (!result.res) {
+                return error(res, 500, 'INTERNAL_SERVER_ERROR');
+            }
+
+            const client = await getClient(ORG_LIST[org]);
             const orderer = await getOrderer(client);
 
             const envelope = fs.readFileSync(path.join(__dirname, CHANNEL_1_PATH));
@@ -80,96 +48,42 @@ export class ChannelController {
 
             const data = await client.createChannel(channelRequest);
 
-            this.response = new SuccessResponse({data});
-
-            res.json(this.response);
+            return response(res, data);
         } catch(err) {
-            await promise(Channel, Channel.deleteOne, {
-                name: channelName,
-            });
+            await promise(Channel, Channel.deleteOne, {channelName});
 
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: err.toString(),
-            });
-
-            return res.status(500).json(this.response);
+            return error(res, 500, 'INTERNAL_SERVER_ERROR', err.toString());
         }
     }
 
     public async join(req: Request, res: Response) {
-        const channelName = req.body.channelName;
-
-        let result = await promise(Channel, Channel.findOne, {
-            name: channelName,
-        });
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (!result.res) {
-            this.response = new ErrorResponse({
-                code: 404,
-                type: 'NOT_FOUND',
-                message: 'Channel does not exists',
-            });
-
-            return res.status(404).json(this.response);
-        }
-
-        result = await promise(Joins, Joins.findOne, {
-            channelName: channelName,
-            org: req.body.org,
-        });
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (result.res) {
-            this.response = new ErrorResponse({
-                code: 403,
-                type: 'FORBIDDEN',
-                message: 'Joins already exists',
-            });
-
-            return res.status(403).json(this.response);
-        }
-
-        const newJoins = new Joins(req.body);
-
-        result = await promise(newJoins, newJoins.save);
-
-        if (result.err) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: result.err.toString(),
-            });
-
-            return res.status(500).json(this.response);
-        }
-
-        if (!result.res) {
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-            });
-
-            return res.status(500).json(this.response);
-        }
+        const {channelName, org} = req.body;
 
         try {
-            const client = await getClient(ORG_LIST[req.body.org]);
+            let result = await promise(Channel, Channel.findOne, {channelName});
+
+            if (!result.res) {
+                return error(res, 404, 'NOT_FOUND', 'Channel does not exists');
+            }
+
+            result = await promise(Joins, Joins.findOne, {
+                channelName,
+                org,
+            });
+
+            if (result.res) {
+                return error(res, 403, 'FORBIDDEN', 'Joins already exists');
+            }
+
+            const newJoins = new Joins(req.body);
+
+            result = await promise(newJoins, newJoins.save);
+
+            if (!result.res) {
+                return error(res, 500, 'INTERNAL_SERVER_ERROR');
+            }
+
+            const client = await getClient(ORG_LIST[org]);
             const orderer = await getOrderer(client);
 
             const channel = client.newChannel(channelName);
@@ -180,7 +94,7 @@ export class ChannelController {
                 txId: client.newTransactionID(),
             });
 
-            const peers = await getPeers(client, ORG_LIST[req.body.org]);
+            const peers = await getPeers(client, ORG_LIST[org]);
 
             const data = await channel.joinChannel({
                 txId: client.newTransactionID(),
@@ -188,21 +102,14 @@ export class ChannelController {
                 targets: peers,
             });
 
-            this.response = new SuccessResponse({data});
-
-            res.json(this.response);
+            return response(res, data);
         } catch(err) {
             await promise(Joins, Joins.deleteOne, {
-                channelName: channelName,
-                org: req.body.org,
+                channelName,
+                org,
             });
 
-            this.response = new ErrorResponse({
-                type: 'INTERNAL_SERVER_ERROR',
-                message: err.toString(),
-            });
-
-            return res.status(500).json(this.response);
+            return error(res, 500, 'INTERNAL_SERVER_ERROR', err.toString());
         }
     }
 }

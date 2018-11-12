@@ -22,5 +22,9 @@ function promiseToAssoc(results: Array<any>) {
         res[field] = results[i];
     }
 
+    if (res.err) {
+        throw new Error(res.err);
+    }
+
     return res;
 }
