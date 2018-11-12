@@ -1,5 +1,5 @@
 import {Request, Response} from 'express';
-import {ORG_LIST, getClient, getChannel} from '../services/client';
+import {ORG_LIST, getUserClient, getChannel} from '../services/client';
 import {error, response} from "../helpers/response";
 
 export class InvokeController {
@@ -41,7 +41,7 @@ export class InvokeController {
         } = req.body;
 
         try {
-            const client = await getClient(ORG_LIST[org]);
+            const client = await getUserClient(ORG_LIST[org]);
 
             const channel = await getChannel(client, ORG_LIST[org], channelName);
 

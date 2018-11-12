@@ -124,17 +124,6 @@ function generateChannelArtifacts() {
 	echo "#################################################################"
 	$CONFIGTXGEN -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org2MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org2MSP
 	echo
-
-	cp ./channel-artifacts/channel.tx ../client/config/channel.tx
-	cp ./crypto-config/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem ../client/cert/orderer.pem
-	cp ./crypto-config/peerOrganizations/org1.example.com/msp/tlscacerts/*.pem ../client/cert/org1_peer_cert.pem
-	cp ./crypto-config/peerOrganizations/org2.example.com/msp/tlscacerts/*.pem ../client/cert/org2_peer_cert.pem
-	cp ./crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/*_sk ../client/cert/org1_private_key
-	cp ./crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp/keystore/*_sk ../client/cert/org2_private_key
-	cp ./crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/signcerts/*.pem ../client/cert/org1_cert.pem
-	cp ./crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp/signcerts/*.pem ../client/cert/org2_cert.pem
-
-	#rm -rf ../client/hfc-key-store
 }
 
 generateCerts

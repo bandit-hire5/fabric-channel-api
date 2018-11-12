@@ -100,10 +100,10 @@ export class ChaincodeController {
             }
 
             const client = await getClient(ORG_LIST[org]);
-
             const channel = await getChannel(client, ORG_LIST[org], channelName);
 
             const results = await channel.sendInstantiateProposal({
+            //const results = await channel.sendUpgradeProposal({
                 chaincodeId: chaincodeName,
                 chaincodeVersion: 'v0',
                 fcn: 'init',

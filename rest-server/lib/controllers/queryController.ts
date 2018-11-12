@@ -1,5 +1,5 @@
 import {Request, Response} from 'express';
-import {getClient, getChannel} from '../services/client';
+import {getUserClient, getChannel, ORG_LIST} from '../services/client';
 import {error, response} from "../helpers/response";
 
 export class QueryController {
@@ -7,7 +7,7 @@ export class QueryController {
         const {chaincodeName, channelName, org} = req.query;
 
         try {
-            const client = await getClient(org);
+            const client = await getUserClient(ORG_LIST[org]);
 
             const channel = await getChannel(client, org, channelName);
 
@@ -33,7 +33,7 @@ export class QueryController {
         const {chaincodeName, channelName, org, id} = req.query;
 
         try {
-            const client = await getClient(org);
+            const client = await getUserClient(ORG_LIST[org]);
 
             const channel = await getChannel(client, org, channelName);
 

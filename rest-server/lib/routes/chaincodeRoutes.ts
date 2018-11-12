@@ -6,7 +6,7 @@ export class Routes {
     public controller: ChaincodeController = new ChaincodeController();
 
     public routes(app: express.Application): void {
-        app.use('/channels', validateOrg('any'), validateChannelName('any'), validateChaincodeName('any'));
+        app.use('/chaincode', validateOrg('any'), validateChannelName('any'), validateChaincodeName('any'));
 
         app.route('/chaincode')
             .post(

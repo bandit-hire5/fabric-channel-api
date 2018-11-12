@@ -17,7 +17,7 @@ export class Routes {
                 this.controller.allCars.bind(this.controller)
             );
 
-        app.route('/query/сar')
+        app.route('/query/car')
             .get(
                 validate('id', 'get'),
                 this.controller.getCar.bind(this.controller)

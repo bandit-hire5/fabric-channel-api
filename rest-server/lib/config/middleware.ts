@@ -96,7 +96,7 @@ export function validateChaincodeName(type) {
             return res.status(400).json(response);
         }
 
-        if (config.allowedChaincodeList.indexOf(req.query.chaincodeName) === -1) {
+        if (config.allowedChaincodeList.indexOf(req[from][field]) === -1) {
             let response = new ErrorResponse({
                 code: 400,
                 type: 'BAD_REQUEST',

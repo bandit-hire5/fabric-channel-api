@@ -13,3 +13,4 @@ rest-server/dist
 rest-server/node_modules
 rest-server/keystore
 rest-server/.env
+log*.txt
