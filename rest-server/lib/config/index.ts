@@ -17,7 +17,13 @@ export default {
                 },
             ],
             adminMSP: '/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp',
+            enrollmentID: 'admin1',
+            enrollmentSecret: '12345678',
             userMSP: '/crypto-config/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp',
+            ca: {
+                url: 'https://localhost:7054',
+                mspid: 'ca1.example.com',
+            },
         },
         org2: {
             peers: [
@@ -35,7 +41,13 @@ export default {
                 },
             ],
             adminMSP: '/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp',
+            enrollmentID: 'admin21',
+            enrollmentSecret: '87654321',
             userMSP: '/crypto-config/peerOrganizations/org2.example.com/users/User1@org2.example.com/msp',
+            ca: {
+                url: 'https://localhost:8054',
+                mspid: 'ca2.example.com',
+            },
         },
     },
     orderer: {
@@ -46,11 +58,11 @@ export default {
     },
     'endorsement-policy': {
         identities: [
-            { role: { name: "member", mspId: "Org1MSP" }},
-            { role: { name: "member", mspId: "Org2MSP" }},
+            { role: { name: "peer", mspId: "Org1MSP" }},
+            { role: { name: "peer", mspId: "Org2MSP" }},
         ],
         policy: {
-            "1-of": [{ "signed-by": 0 }, { "signed-by": 1 }]
+            "2-of": [{ "signed-by": 0 }, { "signed-by": 1 }]
         }
     },
     channels: {

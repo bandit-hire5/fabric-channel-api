@@ -3,7 +3,9 @@ import * as path from 'path';
 import config from '../config';
 
 import Client = require('fabric-client');
+import CaClient = require('fabric-ca-client');
 import {Channel, CryptoContent, Orderer, Peer} from "fabric-client";
+import {TLSOptions} from "fabric-ca-client";
 
 const NETWORK_DIR = '/../../../kafka-network';
 const KEY_STORE_PATH_ADMIN = './keystore/admin';
@@ -75,6 +77,123 @@ export async function getOrderer(client: Client): Promise<Orderer> {
     return orderer;
 }
 
+export async function getEnrolledClient(org: Organization): Promise<Client> {
+    const client = new Client();
+
+    Client.setConfigSetting('request-timeout', 120000);
+
+    const cryptoSuite = Client.newCryptoSuite();
+    cryptoSuite.setCryptoKeyStore(Client.newCryptoKeyStore({
+        path: `${KEY_STORE_PATH_ADMIN}-${org}`,
+    }));
+
+    client.setCryptoSuite(cryptoSuite);
+
+    const store = await Client.newDefaultKeyValueStore({
+        path: `${KEY_STORE_PATH_ADMIN}-${org}`,
+    });
+
+    client.setStateStore(store);
+
+    const adminName = `${org}-admin`;
+
+    const userContext = await client.getUserContext(adminName, true);
+
+    if (userContext && userContext.isEnrolled()) {
+        return client;
+    }
+
+    const tlsOptions: TLSOptions = {
+        trustedRoots: new Buffer([]),
+        verify: false,
+    };
+
+    const caClient = new CaClient(config.orgs[org].ca.url, tlsOptions , config.orgs[org].ca.mspid, cryptoSuite);
+
+    const enrollment = await caClient.enroll({
+        enrollmentID: config.orgs[org].enrollmentID,
+        enrollmentSecret: config.orgs[org].enrollmentSecret,
+    });
+
+    const admin = await client.createUser({
+        username: adminName,
+        mspid: MSP_ID[org],
+        cryptoContent: {
+            privateKeyPEM: enrollment.key.toBytes(),
+            signedCertPEM: enrollment.certificate,
+        },
+        skipPersistence: true,
+    });
+
+    client.setUserContext(admin);
+
+    return client;
+}
+
+export async function getEnrolledUser(org: Organization): Promise<Client> {
+    const client = new Client();
+
+    Client.setConfigSetting('request-timeout', 120000);
+
+    const cryptoSuite = Client.newCryptoSuite();
+    cryptoSuite.setCryptoKeyStore(Client.newCryptoKeyStore({
+        path: `${KEY_STORE_PATH_ADMIN}-${org}`,
+    }));
+
+    client.setCryptoSuite(cryptoSuite);
+
+    const store = await Client.newDefaultKeyValueStore({
+        path: `${KEY_STORE_PATH_ADMIN}-${org}`,
+    });
+
+    client.setStateStore(store);
+
+    const userName = `${org}-user`;
+
+    const userContext = await client.getUserContext(userName, true);
+
+    if (userContext && userContext.isEnrolled()) {
+        return client;
+    }
+
+    const adminName = `${org}-admin`;
+
+    const adminContext = await client.getUserContext(adminName, true);
+
+    if (!adminContext || !adminContext.isEnrolled()) {
+        throw new Error('Failed to get admin');
+    }
+
+    const affiliation = `${org}.department1`;
+
+    const caClient = new CaClient(config.orgs[org].ca.url, null, config.orgs[org].ca.mspid, cryptoSuite);
+
+    const secret = await caClient.register({
+        enrollmentID: userName,
+        affiliation: affiliation,
+        role: 'client',
+    }, adminContext);
+
+    const enrollment = await caClient.enroll({
+        enrollmentID: userName,
+        enrollmentSecret: secret,
+    });
+
+    const user = await client.createUser({
+        username: userName,
+        mspid: MSP_ID[org],
+        cryptoContent: {
+            privateKeyPEM: enrollment.key.toBytes(),
+            signedCertPEM: enrollment.certificate,
+        },
+        skipPersistence: true,
+    });
+
+    client.setUserContext(user);
+
+    return client;
+}
+
 export async function getClient(org: Organization): Promise<Client> {
     const client = new Client();
 
@@ -112,7 +231,7 @@ export async function getClient(org: Organization): Promise<Client> {
     return client;
 }
 
-export async function getUserClient(org: Organization): Promise<Client> {
+export async function getUser(org: Organization): Promise<Client> {
     const client = new Client();
 
     Client.setConfigSetting('request-timeout', 120000);
@@ -167,7 +286,7 @@ async function getAllPeers(client: Client): Promise<Peer[]> {
                 'ssl-target-name-override': ORG.peers[i].mspid,
             });
 
-            peers[i] = p;
+            peers.push(p);
         }
     }
 
